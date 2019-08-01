@@ -122,6 +122,27 @@ for index, row in df_gpd.iterrows():
 
 print("Done!\n")
 
+print("Sorting table by street name, then by house number")
+
+df_gpd = df_gpd.sort_values(by=['address_street_name', 'address_street_number'])
+
+print("Done!\n")
+
+print("Creating table of street GPDs...")
+# Create a dataframe for each street
+street_gpd_base_dict = {'street': [], 'GPD': []}
+street_gpd = pd.DataFrame(street_gpd_base_dict)
+
+for street in street_names:
+    house_data = df_gpd[df_gpd['address_street_name'] == street]
+    gpd = house_data['GPD'].sum()
+
+    street_gpd.loc[len(street_gpd)] = [street, gpd]
+
+street_gpd = street_gpd.sort_values(by=['street'])
+
+print("Done!\n")
+
 elapsed_time = time.time() - start_time
 
 # Round elapsed time to 2 decimal places
@@ -142,9 +163,13 @@ print("Saving GPD data to 'household_gpd.csv'...")
 df_gpd.to_csv('household_gpd.csv', index=False)
 print('Done!\n')
 
-print("Saving GPD data to 'gpd.xlsx'...")
+print("Saving street GPD data to 'streets.csv'...")
+street_gpd.to_csv('streets.csv', index=False)
+print('Done!\n')
+
+print("Saving all GPD data to 'gpd.xlsx'...")
 # Write to Excel sheet
 with pd.ExcelWriter('gpd.xlsx') as writer:
-    df_gpd.to_excel(writer, index=False, sheet_name='GPD')
-
+    df_gpd.to_excel(writer, index=False, sheet_name='Household GPD')
+    street_gpd.to_excel(writer, index=False, sheet_name='Street GPD')
 print("Done!")
