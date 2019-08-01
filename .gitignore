@@ -1,4 +1,7 @@
 .idea/
+*/student.sqlite
+gpd.xlsx
+household_gpd.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

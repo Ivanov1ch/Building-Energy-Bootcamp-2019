@@ -5,14 +5,14 @@ import numpy as np
 plt.style.use('ggplot')
 
 
-def live_plotter_init(x_vec, y_vec, lines, formats, labels, xlabel='X Label', ylabel='Y Label', title='Title'):
+def live_plotter_init(data_df, lines, formats, labels, xlabel='X Label', ylabel='Y Label', title='Title'):
     plt.ion()
     fig = plt.figure(figsize=(13, 6))
     ax = fig.add_subplot(111)
 
     # Only plot the first points
-    for index in range(len(lines)):
-        lines[index] = ax.plot(x_vec[index][:1], y_vec[index][:1], formats[index], alpha=0.8, label=labels[index])
+    # for index in range(len(lines)):
+    #     lines[index] = ax.plot(x_vec[index][:1], y_vec[index][:1], formats[index], alpha=0.8, label=labels[index])
 
     ax.legend()
     plt.xlabel(xlabel)
