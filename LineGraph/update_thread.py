@@ -1,8 +1,11 @@
 import threading
 import numbers
 import time
+import os
+import sys
 import pandas as pd
 import datetime as dt
+from pylive.pylive import has_been_closed
 from BuildingEnergyAPI.building_data_requests_internal import get_value
 
 
@@ -16,7 +19,6 @@ class DataUpdateThread:
         self.fully_stopped = False
 
     def get_new_values(self):
-        print("Updating... {0}".format(dt.datetime.now()))
         df = pd.read_csv(self.csv_path)
 
         retrieved_data = []
@@ -27,33 +29,37 @@ class DataUpdateThread:
             value = float(value) if isinstance(value, numbers.Number) else ''
             retrieved_data.append(value)
 
-            if self.stopped:
+            if self.stopped or has_been_closed():
                 return
 
         retrieved_data.append(dt.datetime.now())
 
         # Add to the end of the DF
         self.data_df.loc[len(self.data_df)] = retrieved_data
-        print("Updated...")
 
     def continuous_update(self, repeat_interval):
         while True:
-            if self.stopped:
+            if self.stopped or has_been_closed():
                 break
             self.get_new_values()
-            if self.stopped:
+            if self.stopped or has_been_closed():
                 break
             time.sleep(repeat_interval)
 
         self.save_data()
         self.fully_stopped = True
+        sys.exit()
 
     def begin_update_thread(self, repeat_interval):
         self.thread = threading.Thread(target=self.continuous_update, args=(repeat_interval,))
         self.thread.start()
 
     def save_data(self):
-        print("Saving")
+        # if file does not exist write to file with header
+        if not os.path.isfile(self.output_path):
+            self.data_df.to_csv(self.output_path, header=True)
+        else:  # else it exists so append without writing the header
+            self.data_df.to_csv(self.output_path, mode='a', header=False)
 
     def stop(self):
         self.stopped = True

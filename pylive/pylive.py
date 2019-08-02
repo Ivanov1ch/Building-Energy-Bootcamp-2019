@@ -1,18 +1,117 @@
-import matplotlib.pyplot as plt
+import sys
 import numpy as np
+import datetime as dt
+import matplotlib
+import matplotlib.pyplot as plt
 
 # use ggplot style for more sophisticated visuals
 plt.style.use('ggplot')
 
+is_closed = False
+panning_allowed = False
+
+
+def enable_panning(event):
+    global panning_allowed
+    panning_allowed = True
+
+
+def disable_panning(event):
+    global panning_allowed
+    panning_allowed = False
+
+
+def has_been_closed():
+    return is_closed
+
+
+def window_closed(event):
+    global is_closed
+    is_closed = True
+
+
+# Converts a numpy.datetime64 to a datetime.datetime object by converting dt64 to UTC time (for later use)
+def datetime64_to_datetime(dt64):
+    return dt.datetime.utcfromtimestamp((dt64 - np.datetime64('1970-01-01T00:00:00Z')) / np.timedelta64(1, 's'))
+
+
+# Gets a list of x (time) and y (sensor reading) coordinates for the index-th column of data_df
+# Also returns the labels for the x ticks (strings in HH:MM:SS) format
+def get_coordinate_lists(data_df, index):
+    time_list = data_df['Time'].tolist()
+    value_list = data_df.iloc[:, index].tolist()
+
+    time_list = [datetime64_to_datetime(time) for time in time_list]
+
+    # Convert time_list to timedeltas, representing the time between each element of time_list and time_list[0]
+    time_list = list(map(lambda time: time - time_list[0], time_list))
+
+    # Convert the timedeltas to seconds
+    time_list_seconds = list(map(lambda timedelta: round(timedelta.total_seconds()), time_list))
+
+    # Convert the timedeltas to HH:MM:SS format
+    time_list_strings = list(map(lambda timedelta: "%.2d:%.2d:%.2d" % (
+        int(timedelta.seconds / 3600), (timedelta.seconds // 60) % 60, timedelta.seconds % 60), time_list))
+
+    return time_list_seconds, value_list, time_list_strings
+
 
 def live_plotter_init(data_df, lines, formats, labels, xlabel='X Label', ylabel='Y Label', title='Title'):
     plt.ion()
-    fig = plt.figure(figsize=(13, 6))
+    fig = plt.figure(figsize=(13, 9))
+    fig.set_size_inches(13, 9, forward=True)
     ax = fig.add_subplot(111)
 
-    # Only plot the first points
-    # for index in range(len(lines)):
-    #     lines[index] = ax.plot(x_vec[index][:1], y_vec[index][:1], formats[index], alpha=0.8, label=labels[index])
+    # Set window title
+    gcf = plt.gcf()
+    gcf.canvas.set_window_title(title)
+
+    # Event bindings
+    close_bind = fig.canvas.mpl_connect('close_event', window_closed)
+    enter_bind = fig.canvas.mpl_connect('axes_enter_event', enable_panning)
+    exit_bind = fig.canvas.mpl_connect('axes_leave_event', disable_panning)
+
+    # Setup mouse wheel zooming
+    def zoom_factory(ax, base_scale=2.):
+        def zoom_fun(event):
+            # get the current x and y limits
+            cur_xlim = ax.get_xlim()
+            cur_ylim = ax.get_ylim()
+            cur_xrange = (cur_xlim[1] - cur_xlim[0]) * .5
+            cur_yrange = (cur_ylim[1] - cur_ylim[0]) * .5
+            xdata = event.xdata  # get event x location
+            ydata = event.ydata  # get event y location
+            if event.button == 'up':
+                # deal with zoom in
+                scale_factor = 1 / base_scale
+            elif event.button == 'down':
+                # deal with zoom out
+                scale_factor = base_scale
+            else:
+                # deal with something that should never happen
+                scale_factor = 1
+                print
+                event.button
+            # set new limits
+            ax.set_xlim([xdata - cur_xrange * scale_factor,
+                         xdata + cur_xrange * scale_factor])
+            ax.set_ylim([ydata - cur_yrange * scale_factor,
+                         ydata + cur_yrange * scale_factor])
+            plt.draw()  # force re-draw
+
+        fi = ax.get_figure()  # get the figure of interest
+        # attach the call back
+        fi.canvas.mpl_connect('scroll_event', zoom_fun)
+
+        # return the function
+        return zoom_fun
+
+    zoom = zoom_factory(ax)
+
+    # Plot initial data
+    for index in range(len(lines)):
+        x_vec, y_vec, skip = get_coordinate_lists(data_df, index)
+        lines[index] = ax.plot(x_vec, y_vec, formats[index], alpha=0.8, label=labels[index])
 
     ax.legend()
     plt.xlabel(xlabel)
@@ -21,14 +120,48 @@ def live_plotter_init(data_df, lines, formats, labels, xlabel='X Label', ylabel=
     plt.show()
 
 
-# the function below is for updating both x and y values (great for updating dates on the x-axis)
-def live_plotter_xy(x_vec, y_vec, lines, stop_index, pause_time=0.01):
+# Update the line graph
+def live_plotter_update(data_df, lines, pause_time=0.01, max_points_to_show=10):
+    # All x_vec and y_vec lists, used to set the bounds of the graph
+    x_vecs = []
+    y_vecs = []
+    time_list_strings = None
+
     for index in range(len(lines)):
-        lines[index][0].set_data(x_vec[index][:stop_index], y_vec[index][:stop_index])
-        plt.xlim(np.min(x_vec[index][:stop_index]), np.max(x_vec[index][:stop_index]))
-        if np.min(y_vec[index][:stop_index]) <= lines[index][0].axes.get_ylim()[0] or np.max(
-                y_vec[index][:stop_index]) >= lines[index][0].axes.get_ylim()[1]:
-            plt.ylim([np.min(y_vec[index][:stop_index]) - np.std(y_vec[index][:stop_index]),
-                      np.max(y_vec[index][:stop_index]) + np.std(y_vec[index][:stop_index])])
+        x_vec, y_vec, list_strings = get_coordinate_lists(data_df, index)
+
+        lines[index][0].set_data(x_vec, y_vec)
+
+        # Add to x_vecs and y_vecs
+        x_vecs.append(x_vec[-max_points_to_show:])
+        y_vecs.append(y_vec[-max_points_to_show:])
+
+        # Override time_list_strings
+        time_list_strings = list_strings
+
+        if has_been_closed():
+            return  # Exit program early if closed
+
+    # Do not adjust bounds if panning because it will send them back to the original view
+    if not panning_allowed:
+        # Adjust the bounds to fit all the lines on the screen and only show at most max_points_to_show at once
+
+        # Find the smallest and largest x values (in the last max_points_to_show of each x_vec in x_vecs)
+        smallest_x = np.min(x_vecs)
+        largest_x = np.max(x_vecs)
+
+        # Find the smallest and largest y values (in the last max_points_to_show of each y_vec in y_vecs)
+        smallest_y = np.min(y_vecs)
+        largest_y = np.max(y_vecs)
+
+        # Adjust the bounds to be a fraction of the standard deviation past the max and min points, to keep space
+        # between the points and the borders
+        plt.xlim(smallest_x - np.std(x_vecs) / 3, largest_x + np.std(x_vecs) / 3)
+        plt.ylim(smallest_y - np.std(y_vecs) / 2, largest_y + np.std(y_vecs) / 2)
+        # Update the x axis to use time_list_strings instead of values in seconds for easier reading (HH:MM:SS format)
+        plt.xticks(x_vecs[len(x_vecs) - 1], time_list_strings, rotation=-45)
+
+    if has_been_closed():
+        return  # Exit program early if closed
 
     plt.pause(pause_time)
