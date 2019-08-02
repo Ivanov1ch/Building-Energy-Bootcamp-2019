@@ -16,7 +16,7 @@ CUBE_IN_PER_CUBIC_FT = 1728
 DEFAULT_DAYS_BETWEEN = 90
 
 # The path to the sqlite file
-db_path = os.path.join('SQLite', 'student.sqlite')
+db_path = os.path.join('SQLiteWaterUsage', 'student.sqlite')
 engine = sqlalchemy.create_engine('sqlite:///' + db_path)  # Read the sqlite file into sqlalchemy
 
 # Read the Water table into a dataframe

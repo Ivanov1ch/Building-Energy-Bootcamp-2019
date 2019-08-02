@@ -4,8 +4,8 @@ gpd.xlsx
 household_gpd.csv
 streets.csv
 build
-SQLite/*.c
-SQLite/*.c*
+SQLiteWaterUsage/*.c
+SQLiteWaterUsage/*.c*
 *.xlsx#
 
 # Byte-compiled / optimized / DLL files
