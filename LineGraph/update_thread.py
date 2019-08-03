@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 import datetime as dt
 from pylive.pylive import has_been_closed
-from BuildingEnergyAPI.building_data_requests_internal import get_value
+from BuildingEnergyAPI.building_data_requests_external import get_value
 
 
 class DataUpdateThread:
@@ -27,7 +27,7 @@ class DataUpdateThread:
             value, units = get_value(row['Facility'], row['Meter'], live=True)
 
             value = float(value) if isinstance(value, numbers.Number) else ''
-            retrieved_data.append(value)
+            retrieved_data.append(round(value, 2))
 
             if self.stopped or has_been_closed():
                 return

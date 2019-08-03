@@ -59,7 +59,6 @@ def get_coordinate_lists(data_df, index):
 def live_plotter_init(data_df, lines, formats, labels, xlabel='X Label', ylabel='Y Label', title='Title'):
     plt.ion()
     fig = plt.figure(figsize=(13, 9))
-    fig.set_size_inches(13, 9, forward=True)
     ax = fig.add_subplot(111)
 
     # Set window title
@@ -113,10 +112,11 @@ def live_plotter_init(data_df, lines, formats, labels, xlabel='X Label', ylabel=
         x_vec, y_vec, skip = get_coordinate_lists(data_df, index)
         lines[index] = ax.plot(x_vec, y_vec, formats[index], alpha=0.8, label=labels[index])
 
-    ax.legend()
+    ax.legend(loc='upper right')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
+    plt.gcf().subplots_adjust(bottom=0.15)
     plt.show()
 
 
@@ -125,6 +125,7 @@ def live_plotter_update(data_df, lines, pause_time=0.01, max_points_to_show=10):
     # All x_vec and y_vec lists, used to set the bounds of the graph
     x_vecs = []
     y_vecs = []
+    last_x_vec = None  # Store the last x_vec, in full (not only the last max_points_to_show points), for time labeling
     time_list_strings = None
 
     for index in range(len(lines)):
@@ -138,6 +139,9 @@ def live_plotter_update(data_df, lines, pause_time=0.01, max_points_to_show=10):
 
         # Override time_list_strings
         time_list_strings = list_strings
+
+        # Override last_x_vec, so the time labels are properly applied to all points, not just those visible
+        last_x_vec = x_vec
 
         if has_been_closed():
             return  # Exit program early if closed
@@ -154,12 +158,15 @@ def live_plotter_update(data_df, lines, pause_time=0.01, max_points_to_show=10):
         smallest_y = np.min(y_vecs)
         largest_y = np.max(y_vecs)
 
+        # Update the x axis to use time_list_strings instead of values in seconds for easier reading (HH:MM:SS format)
+        plt.xticks(last_x_vec, time_list_strings, rotation=-45, ha="left", rotation_mode="anchor")
+
         # Adjust the bounds to be a fraction of the standard deviation past the max and min points, to keep space
         # between the points and the borders
-        plt.xlim(smallest_x - np.std(x_vecs) / 3, largest_x + np.std(x_vecs) / 3)
-        plt.ylim(smallest_y - np.std(y_vecs) / 2, largest_y + np.std(y_vecs) / 2)
-        # Update the x axis to use time_list_strings instead of values in seconds for easier reading (HH:MM:SS format)
-        plt.xticks(x_vecs[len(x_vecs) - 1], time_list_strings, rotation=-45)
+        plt.xlim(smallest_x - np.std(np.asarray(x_vecs).astype(np.float32)) / 3,
+                 largest_x + np.std(np.asarray(x_vecs).astype(np.float32)) / 3)
+        plt.ylim(smallest_y - np.std(np.asarray(y_vecs).astype(np.float32)) / 2,
+                 largest_y + np.std(np.asarray(y_vecs).astype(np.float32)) / 2)
 
     if has_been_closed():
         return  # Exit program early if closed

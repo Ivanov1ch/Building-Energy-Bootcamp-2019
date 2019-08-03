@@ -6,7 +6,7 @@ import numbers
 import pandas as pd
 import datetime as dt
 from LineGraph.update_thread import DataUpdateThread
-from BuildingEnergyAPI.building_data_requests_internal import get_value
+from BuildingEnergyAPI.building_data_requests_external import get_value
 from pylive.pylive import live_plotter_init, live_plotter_update, has_been_closed
 
 # Open dataframe
